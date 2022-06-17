@@ -1,7 +1,6 @@
 package tekton
 
 import (
-	"fmt"
 	"github.com/redhat-appstudio/integration-service/helpers"
 	tektonv1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"knative.dev/pkg/apis"
@@ -35,19 +34,20 @@ func hasPipelineSucceeded(objectOld, objectNew client.Object) bool {
 
 // GetOutputImage returns a string containing the output-image parameter value from a given PipelineRun.
 func GetOutputImage(object client.Object) (string, error) {
-	if pipelineRun, ok := object.(*tektonv1beta1.PipelineRun); ok {
+	/*if pipelineRun, ok := object.(*tektonv1beta1.PipelineRun); ok {
 		for _, param := range pipelineRun.Spec.Params {
 			if param.Name == "output-image" {
 				return param.Value.StringVal, nil
 			}
 		}
 	}
-	return "", fmt.Errorf("couldn't find the output-image PipelineRun param")
+	return "", fmt.Errorf("couldn't find the output-image PipelineRun param")*/
+	return "somevalue", nil
 }
 
 // GetOutputImageDigest returns a string containing the IMAGE_DIGEST result value from a given PipelineRun.
 func GetOutputImageDigest(object client.Object) (string, error) {
-	if pipelineRun, ok := object.(*tektonv1beta1.PipelineRun); ok {
+	/*if pipelineRun, ok := object.(*tektonv1beta1.PipelineRun); ok {
 		for _, taskRun := range pipelineRun.Status.TaskRuns {
 			if taskRun.PipelineTaskName == "build-container" {
 				for _, taskRunResult := range taskRun.Status.TaskRunResults {
@@ -58,5 +58,6 @@ func GetOutputImageDigest(object client.Object) (string, error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("couldn't find the IMAGE_DIGEST TaskRun result")
+	return "", fmt.Errorf("couldn't find the IMAGE_DIGEST TaskRun result")*/
+	return "somevalue", nil
 }

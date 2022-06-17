@@ -19,7 +19,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -93,6 +92,7 @@ func (a *Adapter) EnsureApplicationSnapshotExists() (results.OperationResult, er
 // to the ApplicationSnapshot and the Application's ReleaseLinks exist.
 // Otherwise, it will create new Releases for each ReleaseLink.
 func (a *Adapter) EnsureAllReleasesExist() (results.OperationResult, error) {
+	a.logger.Info("in EnsureAllReleasesExist")
 	existingApplicationSnapshot, err := a.findMatchingApplicationSnapshot()
 	if err != nil {
 		return results.RequeueWithError(err)
@@ -108,7 +108,9 @@ func (a *Adapter) EnsureAllReleasesExist() (results.OperationResult, error) {
 		return results.RequeueOnErrorOrStop(a.updateStatus())
 	}
 
+	a.logger.Info("About to create missing releases")
 	err = a.createMissingReleasesForReleaseLinks(releaseLinks, existingApplicationSnapshot)
+	a.logger.Info("Created missing releases")
 	if err != nil {
 		a.logger.Error(err, "Failed to create new Releases for",
 			"ApplicationSnapshot.Name", existingApplicationSnapshot.Name,
@@ -122,6 +124,7 @@ func (a *Adapter) EnsureAllReleasesExist() (results.OperationResult, error) {
 // getApplicationSnapshot returns the all ApplicationSnapshots in the Application's namespace nil if it's not found.
 // In the case the List operation fails, an error will be returned.
 func (a *Adapter) getAllApplicationSnapshots() (*[]releasev1alpha1.ApplicationSnapshot, error) {
+	a.logger.Info("In getAllApplicationSnapshots")
 	applicationSnapshots := &releasev1alpha1.ApplicationSnapshotList{}
 	opts := []client.ListOption{
 		client.InNamespace(a.application.Namespace),
@@ -138,6 +141,7 @@ func (a *Adapter) getAllApplicationSnapshots() (*[]releasev1alpha1.ApplicationSn
 
 // compareApplicationSnapshots compares two ApplicationSnapshots and returns boolean true if their images match exactly.
 func (a *Adapter) compareApplicationSnapshots(expectedApplicationSnapshot *releasev1alpha1.ApplicationSnapshot, foundApplicationSnapshot *releasev1alpha1.ApplicationSnapshot) bool {
+	a.logger.Info("In compareApplicationSnapshots")
 	snapshotsHaveSameNumberOfImages :=
 		len(expectedApplicationSnapshot.Spec.Images) == len(foundApplicationSnapshot.Spec.Images)
 	allImagesMatch := true
@@ -158,6 +162,7 @@ func (a *Adapter) compareApplicationSnapshots(expectedApplicationSnapshot *relea
 
 // findMatchingApplicationSnapshot tries to find the expected ApplicationSnapshot with the same set of images.
 func (a *Adapter) findMatchingApplicationSnapshot() (*releasev1alpha1.ApplicationSnapshot, error) {
+	a.logger.Info("In findMatchingApplicationSnapshot")
 	var allApplicationSnapshots *[]releasev1alpha1.ApplicationSnapshot
 	expectedApplicationSnapshot, err := a.prepareApplicationSnapshotForPipelineRun(a.pipelineRun, a.component, a.application)
 	if err != nil {
@@ -178,6 +183,7 @@ func (a *Adapter) findMatchingApplicationSnapshot() (*releasev1alpha1.Applicatio
 // getAllApplicationComponents loads from the cluster all Components associated with the given Application.
 // If the Application doesn't have any Components or this is not found in the cluster, an error will be returned.
 func (a *Adapter) getAllApplicationComponents(application *hasv1alpha1.Application) (*[]hasv1alpha1.Component, error) {
+	a.logger.Info("In getAllApplicationComponents")
 	applicationComponents := &hasv1alpha1.ComponentList{}
 	opts := []client.ListOption{
 		client.InNamespace(application.Namespace),
@@ -196,6 +202,7 @@ func (a *Adapter) getAllApplicationComponents(application *hasv1alpha1.Applicati
 // ReleaseLinks are not found, an error will be returned. A ReleaseLink will only be returned if it has the
 // release.appstudio.openshift.io/auto-release label set to true or if it is missing the label entirely.
 func (a *Adapter) getAllApplicationReleaseLinks(application *hasv1alpha1.Application) (*[]releasev1alpha1.ReleaseLink, error) {
+	a.logger.Info("In getAllApplicationReleaseLinks")
 	releaseLinks := &releasev1alpha1.ReleaseLinkList{}
 	labelSelector := labels.NewSelector()
 	rlReq, err := labels.NewRequirement("release.appstudio.openshift.io/auto-release", selection.NotIn, []string{"false"})
@@ -211,6 +218,13 @@ func (a *Adapter) getAllApplicationReleaseLinks(application *hasv1alpha1.Applica
 	}
 
 	err = a.client.List(a.context, releaseLinks, &opts)
+	/*releaseLinks := &releasev1alpha1.ReleaseLinkList{}
+	opts := []client.ListOption{
+		client.InNamespace(application.Namespace),
+		client.MatchingFields{"spec.application": application.Name},
+	}
+
+	err := a.client.List(a.context, releaseLinks, opts...)*/
 	if err != nil {
 		return nil, err
 	}
@@ -221,6 +235,7 @@ func (a *Adapter) getAllApplicationReleaseLinks(application *hasv1alpha1.Applica
 // getApplicationSnapshot returns the all ApplicationSnapshots in the Application's namespace nil if it's not found.
 // In the case the List operation fails, an error will be returned.
 func (a *Adapter) getReleasesWithApplicationSnapshot(applicationSnapshot *releasev1alpha1.ApplicationSnapshot) (*[]releasev1alpha1.Release, error) {
+	a.logger.Info("In getReleasesWithApplicationSnapshot")
 	releases := &releasev1alpha1.ReleaseList{}
 	opts := []client.ListOption{
 		client.InNamespace(applicationSnapshot.Namespace),
@@ -238,6 +253,7 @@ func (a *Adapter) getReleasesWithApplicationSnapshot(applicationSnapshot *releas
 // getImagePullSpecFromPipelineRun gets the full image pullspec from the given build PipelineRun,
 // In case the Image pullspec can't be can't be composed, an error will be returned.
 func (a *Adapter) getImagePullSpecFromPipelineRun(pipelineRun *tektonv1beta1.PipelineRun) (string, error) {
+	a.logger.Info("In getImagePullSpecFromPipelineRun")
 	var err error
 	outputImage, err := tekton.GetOutputImage(pipelineRun)
 	if err != nil {
@@ -247,13 +263,15 @@ func (a *Adapter) getImagePullSpecFromPipelineRun(pipelineRun *tektonv1beta1.Pip
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s@%s", strings.Split(outputImage, ":")[0], imageDigest), nil
+	//return fmt.Sprintf("%s@%s", strings.Split(outputImage, ":")[0], imageDigest), nil
+	return fmt.Sprintf("%s@%s", outputImage, imageDigest), nil
 }
 
 // prepareApplicationSnapshotForPipelineRun prepares the ApplicationSnapshot for a given PipelineRun,
 // component and application. In case the ApplicationSnapshot can't be created, an error will be returned.
 func (a *Adapter) prepareApplicationSnapshotForPipelineRun(pipelineRun *tektonv1beta1.PipelineRun,
 	component *hasv1alpha1.Component, application *hasv1alpha1.Application) (*releasev1alpha1.ApplicationSnapshot, error) {
+	a.logger.Info("In prepareApplicationSnapshotForPipelineRun")
 	applicationComponents, err := a.getAllApplicationComponents(application)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all Application Components for Application %s", a.application.Name)
@@ -291,6 +309,7 @@ func (a *Adapter) prepareApplicationSnapshotForPipelineRun(pipelineRun *tektonv1
 // In case the ApplicationSnapshot can't be created, an error will be returned.
 func (a *Adapter) createApplicationSnapshotForPipelineRun(pipelineRun *tektonv1beta1.PipelineRun,
 	component *hasv1alpha1.Component, application *hasv1alpha1.Application) (*releasev1alpha1.ApplicationSnapshot, error) {
+	a.logger.Info("In createApplicationSnapshotForPipelineRun")
 	applicationSnapshot, err := a.prepareApplicationSnapshotForPipelineRun(pipelineRun, component, application)
 	if err != nil {
 		return nil, err
@@ -307,6 +326,7 @@ func (a *Adapter) createApplicationSnapshotForPipelineRun(pipelineRun *tektonv1b
 // createReleaseForReleaseLink creates the Release for a given ReleaseLink.
 // In case the Release can't be created, an error will be returned.
 func (a *Adapter) createReleaseForReleaseLink(releaseLink *releasev1alpha1.ReleaseLink, applicationSnapshot *releasev1alpha1.ApplicationSnapshot) (*releasev1alpha1.Release, error) {
+	a.logger.Info("In createReleaseForReleaseLink")
 	newRelease := &releasev1alpha1.Release{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: applicationSnapshot.Name + "-",
@@ -328,12 +348,15 @@ func (a *Adapter) createReleaseForReleaseLink(releaseLink *releasev1alpha1.Relea
 // createReleaseForReleaseLink checks if there's existing Releases for a given list of ReleaseLinks and creates new ones
 // if they are missing. In case the Releases can't be created, an error will be returned.
 func (a *Adapter) createMissingReleasesForReleaseLinks(releaseLinks *[]releasev1alpha1.ReleaseLink, applicationSnapshot *releasev1alpha1.ApplicationSnapshot) error {
+	a.logger.Info("In createMissingReleasesForReleaseLinks")
 	releases, err := a.getReleasesWithApplicationSnapshot(applicationSnapshot)
 	if err != nil {
 		return err
 	}
 
+	a.logger.Info("About to tackle the release links")
 	for _, releaseLink := range *releaseLinks {
+		a.logger.Info("Iterating over a release link")
 		var existingRelease *releasev1alpha1.Release = nil
 		for _, snapshotRelease := range *releases {
 			if snapshotRelease.Spec.ReleaseLink == releaseLink.Name {
@@ -361,5 +384,6 @@ func (a *Adapter) createMissingReleasesForReleaseLinks(releaseLinks *[]releasev1
 
 // updateStatus updates the status of the PipelineRun being processed.
 func (a *Adapter) updateStatus() error {
+	a.logger.Info("In updateStatus")
 	return a.client.Status().Update(a.context, a.pipelineRun)
 }
